@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.0/build/pure-min.css" integrity="sha384-nn4HPE8lTHyVtfCBi5yW9d20FjT8BJwUXyWZT9InLYax14RDjBj46LmSztkmNP9w" crossorigin="anonymous">
+
+    <!--[if lte IE 8]>
+    <link rel="stylesheet" href="//purecss.io/combo/1.18.13?/css/layouts/email-old-ie.css">
+    <![endif]-->
+    <!--[if gt IE 8]><!-->
+    <link rel="stylesheet" href="//purecss.io/combo/1.18.13?/css/layouts/email.css">
+    <!--<![endif]-->
+    <!--[if lt IE 9]>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7/html5shiv.js"></script>
+    <![endif]-->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.map"></script>
+    <script src="https://unpkg.com/mqtt@2.12.0/dist/mqtt.min.js"></script>
+</head>
+<body>
+<div id="layout" class="content pure-g">
+    <div class="pure-u-1">
+        <div>
+            <div class="email-item  pure-g">
+                <form class="pure-u-3-4">
+                    <input type="text" id="GroupName" placeholder="Group Name" required>
+                    <input type="text" id="EmailParticipant1" placeholder="Email participant 1" required>
+                    <button id="createChat" class="secondary-button pure-button">Create chat</button>
+                </form>
+            </div>
+        </div>
+        <div id="list"></div>
+    </div>
+
+    <div id="main" class="pure-u-1">
+        <div class="email-content">
+            <div class="email-content-header pure-g">
+                <div class="pure-u-1-2">
+                    <h1 class="email-content-title" id="roomName"></h1>
+                    <p class="email-content-subtitle" id="roomDate"></p>
+                </div>
+
+                <div class="email-content-controls pure-u-1-2">
+                    <button id="logout" class="secondary-button pure-button">Logout</button>
+                </div>
+            </div>
+
+            <div id="body" class="email-content-body" style="width: 800px;">
+            </div>
+
+
+            <form action="#">
+                <textarea name="reply" id="reply-text" style="width: 800px; height: 100px;"></textarea>
+                <input type="submit" id="reply" value="Reply" class="secondary-button pure-button">
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    function CheckUser() {
+        var user = localStorage.getItem("user")
+
+        if (user == null) {
+            window.location.href = "/home/chat.html"
+            return false;
+        }
+
+        return JSON.parse(user)
+    }
+
+    function GetChats() {
+        var user = CheckUser();
+        var token = user.token;
+
+        // list chats
+        $.ajax({
+            method: "GET",
+            url: "/api/v1/chats",
+            headers: {
+                "ACCESS_TOKEN": token
+            }
+        }).done(function( data, textStatus, xhr ) {
+            if (data.chats !== null) {
+                $("#list").empty(); // clear list
+                for (var i = 0; i < data.chats.length; i++) {
+                    var id = data.chats[i].Id;
+                    var created = data.chats[i].CreatedAt
+                    var name = data.chats[i].Name
+                    var participants = "";
+
+                    for (var j = 0; j < data.chats[i].Participants.length; j++) {
+                        participants += data.chats[i].Participants[j].Email + ", "
+                    }
+
+                    var append = '<div class="email-item chat pure-g" onclick="GetChatMessage(' + "'" + id + "','" + name + "','" + created + "','" + participants + "'" + ')">' +
+                        '            <div class="pure-u-3-4">' +
+                        '                <h5 class="email-name">' + created + '</h5>' +
+                        '                <h4 class="email-subject">' + name + '</h4>' +
+                        '                   <p class="email-desc">' + participants + '</p>'
+                        '            </div>' +
+                        '        </div>'
+                    $("#list").append(append)
+
+                }
+            }
+            console.log(data)
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            alert("Error: " + jqXHR.responseJSON.error)
+            console.log(jqXHR.responseJSON)
+        });
+    }
+
+
+    function GetMessageByRoomId(id) {
+        var user = CheckUser();
+        var token = user.token;
+
+        $.ajax({
+            method: "GET",
+            url: "/api/v1/messages?room_id=" + id,
+            data: {},
+            headers: {
+                "access_token": token
+            }
+        }).done(function( data, textStatus, xhr ) {
+            console.log(data)
+
+            $("#body").empty();
+            if(data.messages != null) {
+                for(var i = 0; i < data.messages.length; i++) {
+                    var append = '<div>' + data.messages[i].SendAt + ' ' + data.messages[i].Sender.Email + ': ' +  data.messages[i].Message + '</div>'
+                    $("#body").append(append)
+                }
+            }
+
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            alert("Error: " + jqXHR.responseJSON.error)
+            console.log(jqXHR.responseJSON)
+        });
+    }
+
+    function GetChatMessage(id, name, created, participant) {
+        var chat = {
+            Id: id,
+            Name: name,
+            SendAt: created,
+            Participants: participant
+        }
+
+        $("#roomName").text(name);
+        $("#roomDate").text(created);
+
+        console.log(id)
+
+        // still json string
+        localStorage.setItem("current_chat", JSON.stringify(chat));
+        GetMessageByRoomId(id);
+    }
+
+
+    CheckUser();
+    GetChats();
+
+    $("#createChat").click(function (e) {
+        e.preventDefault();
+
+        var groupName = $("#GroupName").val();
+        var participant1 = $("#EmailParticipant1").val();
+
+        var user = CheckUser();
+        var token = user.token;
+
+        $.ajax({
+            method: "POST",
+            url: "/api/v1/chats",
+            data: {
+                emails: participant1,
+                name: groupName
+            },
+            headers: {
+                "access_token": token
+            }
+        }).done(function( data, textStatus, xhr ) {
+            GetChats();
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            alert("Error: " + jqXHR.responseJSON.error)
+            console.log(jqXHR.responseJSON)
+        });
+
+        console.log(groupName, participant1);
+    });
+
+    $("#reply").click(function (e) {
+       e.preventDefault();
+
+       var room_id = JSON.parse(localStorage.getItem("current_chat")).Id;
+       var message = $("#reply-text").val();
+
+        var user = CheckUser();
+        var token = user.token;
+
+        $.ajax({
+            method: "POST",
+            url: "/api/v1/messages",
+            data: {
+                message: message,
+                room_id: room_id
+            },
+            headers: {
+                "access_token": token
+            }
+        }).done(function( data, textStatus, xhr ) {
+            GetChats();
+            GetMessageByRoomId(room_id);
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            alert("Error: " + jqXHR.responseJSON.error)
+            console.log(jqXHR.responseJSON)
+        });
+
+       console.log(room_id, message);
+    });
+
+    $("#logout").click(function (e) {
+        e.preventDefault();
+        // only delete local storage, lost connect to websocket and redirect /home/chat.html
+        localStorage.clear()
+        window.location.href = "/home/chat.html"
+    });
+</script>
+
+
+<script>
+    var client;
+    window.addEventListener("load", function(evt) {
+        if (client !== undefined) {
+            return false;
+        }
+
+        var user = CheckUser();
+        var id = user.id;
+
+        client = mqtt.connect("ws://localhost:8083/mqtt") // you add a ws:// url here
+        client.subscribe(id)
+
+        client.on("message", function (topic, payload) {
+            var msg = [topic, payload].join(": ");
+//            console.log(msg + "ok msg");
+            var data = JSON.parse(payload);
+            console.log(data);
+
+
+            var room = localStorage.getItem("current_chat");
+            var room_id = "";
+            if (room != null) {
+                room_id = JSON.parse(room).Id
+            }
+
+            if (data.type == "new_room") {
+                GetChats();
+            }
+
+            if (data.type == "new_message") {
+                if (data.room_id == room_id) {
+                    // update current view when it opened
+                    GetMessageByRoomId(room_id);
+                }
+            }
+            // client.end() // don't close session
+        });
+
+        return false;
+    });
+</script>
+</body>
+</html>

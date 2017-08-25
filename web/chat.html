@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.0/build/pure-min.css" integrity="sha384-nn4HPE8lTHyVtfCBi5yW9d20FjT8BJwUXyWZT9InLYax14RDjBj46LmSztkmNP9w" crossorigin="anonymous">
+    <!--[if lte IE 8]>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.0/build/grids-responsive-old-ie-min.css">
+    <![endif]-->
+    <!--[if gt IE 8]><!-->
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.0/build/grids-responsive-min.css">
+    <!--<![endif]-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.map"></script>
+</head>
+<body>
+
+
+<div class="pure-g" style="padding: 100px;">
+    <div class="pure-u-1-2">
+        <form class="pure-form pure-form-stacked">
+            <fieldset>
+                <legend>Register</legend>
+
+                <label for="regemail">Email</label>
+                <input id="regemail" type="email" placeholder="Email" required>
+
+                <label for="regpassword">Password</label>
+                <input id="regpassword" type="password" placeholder="Password" required>
+
+                <button type="submit" id="registerBtn" class="pure-button pure-button-primary">Register</button>
+            </fieldset>
+        </form>
+
+    </div>
+    <div class="pure-u-1-2">
+        <form class="pure-form pure-form-stacked">
+            <fieldset>
+                <legend>Login</legend>
+
+                <label for="loginemail">Email</label>
+                <input id="loginemail" type="email" placeholder="Email" required>
+
+                <label for="loginpassword">Password</label>
+                <input id="loginpassword" type="password" placeholder="Password" required>
+
+                <button type="submit" id="loginBtn" class="pure-button pure-button-primary">Sign in</button>
+            </fieldset>
+        </form>
+    </div>
+</div>
+
+<script>
+$("#registerBtn").click(function (e) {
+    e.preventDefault();
+
+    var email = $("#regemail").val();
+    var password = $("#regpassword").val();
+
+    console.log(email, password);
+    $.ajax({
+        method: "POST",
+        url: "/api/v1/register",
+        data: {
+            email: email,
+            password: password
+        }
+    }).done(function( data, textStatus, xhr ) {
+        alert("Success register user: " + data.user.email + " at " + data.user.registered_at)
+        console.log(data)
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        alert("Error: " + jqXHR.responseJSON.error)
+        console.log(jqXHR.responseJSON)
+    });
+
+});
+
+
+$("#loginBtn").click(function (e) {
+    e.preventDefault();
+
+    var email = $("#loginemail").val();
+    var password = $("#loginpassword").val();
+
+    console.log(email, password);
+    $.ajax({
+        method: "POST",
+        url: "/api/v1/login",
+        data: {
+            email: email,
+            password: password
+        }
+    }).done(function( data, textStatus, xhr ) {
+        var token = data.user.token
+        if (typeof(Storage) !== "undefined") {
+            localStorage.setItem("user", JSON.stringify(data.user));
+
+            window.location.href = "/home/dashboard.html"
+            console.log(token)
+
+
+        } else {
+            // Sorry! No Web Storage support..
+        }
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        alert("Error: " + jqXHR.responseJSON.error)
+        console.log(jqXHR.responseJSON)
+    });
+
+});
+</script>
+</body>
+</html>
